@@ -15,7 +15,15 @@ jobs:
       options: --user root
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      DISPLAY: :99  # Set a dummy display for headless operation
+      # Critical environment variables for headless Godot operation
+      DISPLAY: :99
+      # Prevent Godot from trying to access hardware or show windows
+      HEADLESS: 1
+      EDITOR_DISABLED: 1
+      # Use wayland backend which works better in headless containers
+      GDK_BACKEND: wayland
+      # Timeout for godot commands (in seconds) - prevents hanging
+      GODOT_COMMAND_TIMEOUT: 120
       timeout-minutes: 30
 
     steps:
@@ -34,7 +42,8 @@ jobs:
             zlib1g \
             wget \
             unzip \
-            xvfb  # Install X virtual framebuffer for headless display
+            xvfb \
+            dbus-x11  # Essential for proper session management
 
       - name: Set up Java
         uses: actions/setup-java@v4.7.0
@@ -49,31 +58,85 @@ jobs:
         run: |
           # Link Godot executable
           ln -s /usr/bin/godot /godot
-          # Install export templates for Godot 4.2.1 stable using xvfb for headless
-          echo "Installing Godot export templates..."
-          xvfb-run --auto-servernum godot --headless --install-templates || \
-          echo "Template installation failed with xvfb, trying alternative method..."
           
-          # Alternative: Download and install templates manually
-          if [ ! -d "$HOME/.local/share/godot/templates/4.2.1.stable" ]; then
-            echo "Attempting manual template installation..."
-            mkdir -p "$HOME/.local/share/godot/templates"
-            # Download export templates from official Godot site
-            wget -q https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz -O /tmp/godot_templates.tpz
-            if [ -f /tmp/godot_templates.tpz ]; then
-              unzip -q /tmp/godot_templates.tpz -d "$HOME/.local/share/godot/templates/"
-              mv "$HOME/.local/share/godot/templates/templates" "$HOME/.local/share/godot/templates/4.2.1.stable" 2>/dev/null || true
-              echo "Manual template installation completed"
+          echo "Starting Godot export template installation..."
+          
+          # Create .local directory if it doesn't exist
+          mkdir -p "$HOME/.local/share"
+          
+          # Method 1: Try using xvfb with dbus and timeout
+          echo "Attempting template installation with xvfb and timeout..."
+          if dbus-launch --exit-with-session \
+             xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24:0" \
+             timeout "$GODOT_COMMAND_TIMEOUT" godot --headless --verbose --install-templates; then
+            echo "✓ Template installation successful via xvfb method"
+          else
+            echo "✗ xvfb method failed, trying direct headless approach..."
+            
+            # Method 2: Try with explicit headless flags and environment
+            if HEADLESS=1 EDITOR_DISABLED=1 timeout "$GODOT_COMMAND_TIMEOUT" \
+               godot --headless --verbose --install-templates; then
+              echo "✓ Template installation successful via direct headless method"
             else
-              echo "Failed to download export templates"
+              echo "✗ Both automatic methods failed, using manual download..."
+              
+              # Method 3: Manual download and installation (most reliable)
+              mkdir -p "$HOME/.local/share/godot/templates"
+              cd "$HOME/.local/share/godot/templates"
+              
+              echo "Downloading export templates from official Godot mirror..."
+              # Try multiple mirrors in case one fails
+              MIRRORS=(
+                "https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
+                "https://mirror.godotengine.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
+              )
+              
+              DOWNLOAD_SUCCESS=0
+              for MIRROR in "${MIRRORS[@]}"; do
+                echo "Trying mirror: $MIRROR"
+                if wget --timeout=30 --tries=2 "$MIRROR" -O godot_templates.tpz; then
+                  DOWNLOAD_SUCCESS=1
+                  break
+                fi
+              done
+              
+              if [ $DOWNLOAD_SUCCESS -eq 0 ]; then
+                echo "✗ Failed to download export templates from all mirrors"
+                exit 1
+              fi
+              
+              echo "Extracting templates..."
+              if unzip -q godot_templates.tpz; then
+                # The tpz file contains a 'templates' directory that needs to be versioned
+                if [ -d "templates" ]; then
+                  mv templates 4.2.1.stable
+                  echo "✓ Templates installed via download method"
+                else
+                  # Find what was actually extracted
+                  for dir in */; do
+                    if [ -d "$dir" ] && [ "$dir" != "./" ]; then
+                      mv "$dir" 4.2.1.stable
+                      echo "✓ Renamed extracted directory to 4.2.1.stable"
+                      break
+                    fi
+                  done
+                fi
+                rm -f godot_templates.tpz
+              else
+                echo "✗ Failed to extract export templates"
+                exit 1
+              fi
             fi
           fi
           
-          # Verify templates exist
+          # Final verification
+          echo "Verifying template installation..."
           if [ -d "$HOME/.local/share/godot/templates/4.2.1.stable" ]; then
-            echo "Export templates installed successfully"
+            echo "✓ Export templates verified at: $HOME/.local/share/godot/templates/4.2.1.stable"
+            ls -la "$HOME/.local/share/godot/templates/4.2.1.stable"
           else
-            echo "ERROR: Export templates not found in expected location"
+            echo "✗ ERROR: Export templates not found after installation attempts"
+            echo "Contents of $HOME/.local/share/godot/templates/:"
             ls -la "$HOME/.local/share/godot/templates/"
             exit 1
           fi
@@ -100,16 +163,28 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "Starting Android export..."
-          # Use release if secrets provided, otherwise debug
+          
+          # Determine export type
           if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "Using release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
-            echo "Exporting release build..."
-            xvfb-run --auto-servernum godot --headless --export-release Android tankfighter.apk --verbose
+            EXPORT_TYPE="--export-release"
           else
             echo "Using debug export..."
-            xvfb-run --auto-servernum godot --headless --export-debug Android tankfighter.apk --verbose
+            EXPORT_TYPE="--export-debug"
           fi
+          
+          # Run export with proper headless environment and timeout
+          echo "Running Godot export with timeout and headless settings..."
+          if dbus-launch --exit-with-session \
+             xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24:0" \
+             timeout "$GODOT_COMMAND_TIMEOUT" godot --headless --verbose $EXPORT_TYPE Android tankfighter.apk; then
+            echo "✓ Android export completed successfully"
+          else
+            echo "✗ Android export failed"
+            exit 1
+          fi
+          
           echo "Export command completed"
 
       - name: List files after export
