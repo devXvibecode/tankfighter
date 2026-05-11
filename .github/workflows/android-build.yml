@@ -13,6 +13,8 @@ jobs:
       # Using flashlight13/godot image (official Godot Docker build)
       image: flashlight13/godot:4.2.1
       options: --user root
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
       - name: Checkout code
