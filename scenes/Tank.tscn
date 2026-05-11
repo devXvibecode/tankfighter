@@ -1,0 +1,6 @@
+[gd_scene load_steps=3 format=3 uid="::9876543210"]
+[ext_resource type="Script" path="res://scripts/Tank.gd" id=1]
+[ext_resource type="Texture2D" path="res://assets/tank.png" id=2]
+[node type="CharacterBody2D" name="Tank"]
+script = ExtResource( 1 )
+sprite_frames = ExtResource( 2 )
