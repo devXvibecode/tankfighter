@@ -1,0 +1,28 @@
+{
+  "weapons": [
+    {
+      "name": "Basic Shell",
+      "damage": 25,
+      "radius": 20,
+      "speed": 15,
+      "gravityScale": 1.0,
+      "windInfluence": 0.5
+    },
+    {
+      "name": "Heavy Shell",
+      "damage": 50,
+      "radius": 30,
+      "speed": 10,
+      "gravityScale": 1.2,
+      "windInfluence": 0.3
+    },
+    {
+      "name": "Rocket",
+      "damage": 40,
+      "radius": 25,
+      "speed": 25,
+      "gravityScale": 0.8,
+      "windInfluence": 0.7
+    }
+  ]
+}
