@@ -1,0 +1,19 @@
+[application]
+
+config/name="Tank Fighter"
+description="A 4-player LAN Tank Game for Android"
+author="devXvibecode"
+version_major=1
+version_minor=0
+version_patch=0
+
+[rendering]
+
+renderer/rendering_method="forward_plus"
+renderer/use_hdr=true
+renderer/use_fsr=true
+renderer/fsr_sharpness=0.5
+
+[input]
+
+joypad/deadzone=0.2
