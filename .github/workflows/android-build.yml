@@ -15,6 +15,7 @@ jobs:
       options: --user root
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      DISPLAY: :99  # Set a dummy display for headless operation
       timeout-minutes: 30
 
     steps:
@@ -32,7 +33,8 @@ jobs:
             libstdc++6 \
             zlib1g \
             wget \
-            unzip
+            unzip \
+            xvfb  # Install X virtual framebuffer for headless display
 
       - name: Set up Java
         uses: actions/setup-java@v4.7.0
@@ -47,15 +49,33 @@ jobs:
         run: |
           # Link Godot executable
           ln -s /usr/bin/godot /godot
-          # Install export templates for Godot 4.2.1 stable
+          # Install export templates for Godot 4.2.1 stable using xvfb for headless
           echo "Installing Godot export templates..."
-          godot --headless --install-templates || echo "Template installation failed, checking if already present..."
+          xvfb-run --auto-servernum godot --headless --install-templates || \
+          echo "Template installation failed with xvfb, trying alternative method..."
+          
+          # Alternative: Download and install templates manually
+          if [ ! -d "$HOME/.local/share/godot/templates/4.2.1.stable" ]; then
+            echo "Attempting manual template installation..."
+            mkdir -p "$HOME/.local/share/godot/templates"
+            # Download export templates from official Godot site
+            wget -q https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz -O /tmp/godot_templates.tpz
+            if [ -f /tmp/godot_templates.tpz ]; then
+              unzip -q /tmp/godot_templates.tpz -d "$HOME/.local/share/godot/templates/"
+              mv "$HOME/.local/share/godot/templates/templates" "$HOME/.local/share/godot/templates/4.2.1.stable" 2>/dev/null || true
+              echo "Manual template installation completed"
+            else
+              echo "Failed to download export templates"
+            fi
+          fi
+          
           # Verify templates exist
           if [ -d "$HOME/.local/share/godot/templates/4.2.1.stable" ]; then
             echo "Export templates installed successfully"
           else
-            echo "WARNING: Export templates not found in expected location"
+            echo "ERROR: Export templates not found in expected location"
             ls -la "$HOME/.local/share/godot/templates/"
+            exit 1
           fi
 
       - name: Verify Godot and Android Setup
@@ -85,10 +105,10 @@ jobs:
             echo "Using release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
             echo "Exporting release build..."
-            godot --headless --export-release Android tankfighter.apk --verbose
+            xvfb-run --auto-servernum godot --headless --export-release Android tankfighter.apk --verbose
           else
             echo "Using debug export..."
-            godot --headless --export-debug Android tankfighter.apk --verbose
+            xvfb-run --auto-servernum godot --headless --export-debug Android tankfighter.apk --verbose
           fi
           echo "Export command completed"
 
