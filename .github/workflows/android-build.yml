@@ -10,8 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # Using Godot 4.2.1 stable image from Docker Hub
-      image: godotengine/godot:4.2.1-stable
+      # Using flashlight13/godot image (official Godot Docker build)
+      image: flashlight13/godot:4.2.1
       options: --user root
 
     steps:
