@@ -44,6 +44,14 @@ jobs:
           api-level: 33
           build-tools: 33.0.0
 
+      - name: Setup Godot Android Export Templates
+        run: |
+          # Create debug keystore if it doesn't exist (needed for export)
+          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          
+          # Link Godot executable
+          ln -s /usr/bin/godot /godot
+
       - name: Export Android Project
         env:
           # These secrets need to be set in the repository settings
@@ -52,18 +60,17 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          # Link Godot executable for easier access
-          ln -s /usr/bin/godot /godot
-          
-          # If keystore secrets are provided, use them for release build
-          if [ -n "$ANDROID_KEYSTORE" ]; then
+          # If we have release keystore secrets, use them
+          if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "Setting up release keystore..."
-            echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/keystore.jks
-            godot --headless --export-debug Android tankfighter.apk \
-              --export-debug-template \
+            echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
+            
+            # Export release build
+            godot --headless --export-release Android tankfighter.apk \
               --verbose
           else
-            echo "No keystore provided, exporting debug APK..."
+            echo "No release keystore provided, exporting debug APK..."
+            # Export debug build (uses default debug.keystore)
             godot --headless --export-debug Android tankfighter.apk \
               --verbose
           fi
