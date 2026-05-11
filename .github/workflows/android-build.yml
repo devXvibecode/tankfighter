@@ -11,17 +11,15 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      # Using flashlight13/godot image (official Godot Docker build)
       image: flashlight13/godot:4.2.1
       options: --user root
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      # Set timeout for the job
       timeout-minutes: 30
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v4.2.2
         with:
           fetch-depth: 0
 
@@ -37,51 +35,101 @@ jobs:
             unzip
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v4.7.0
         with:
           distribution: 'temurin'
           java-version: '17'
-          cache: 'gradle'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          api-level: 33
-          build-tools: 33.0.0
+        uses: android-actions/setup-android@v3.1.0
 
-      - name: Setup Godot Android Export Templates
+      - name: Setup Godot Export Templates
         run: |
-          # Create debug keystore if it doesn't exist (needed for export)
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          
           # Link Godot executable
           ln -s /usr/bin/godot /godot
+          # Install export templates for Godot 4.2.1 stable
+          echo "Installing Godot export templates..."
+          godot --headless --install-templates || echo "Template installation failed, checking if already present..."
+          # Verify templates exist
+          if [ -d "$HOME/.local/share/godot/templates/4.2.1.stable" ]; then
+            echo "Export templates installed successfully"
+          else
+            echo "WARNING: Export templates not found in expected location"
+            ls -la "$HOME/.local/share/godot/templates/"
+          fi
 
-      - name: Export Android Project
+      - name: Verify Godot and Android Setup
+        run: |
+          echo "Godot version:"
+          godot --version
+          echo "Android debug keystore exists: [[ -f debug.keystore ]] && echo 'yes' || echo 'no'"
+          ls -la debug.keystore 2>/dev/null || echo "Keystore not found"
+
+      - name: List files before export
+        run: |
+          echo "=== PRE-EXPORT FILE LISTING ==="
+          echo "Current directory: $(pwd)"
+          echo "Files in current directory:"
+          ls -la
+
+      - name: Export Android Project (Debug)
         env:
-          # These secrets need to be set in the repository settings
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
           ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          # If we have release keystore secrets, use them
+          echo "Starting Android export..."
+          # Use release if secrets provided, otherwise debug
           if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
-            echo "Setting up release keystore..."
+            echo "Using release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
-            
-            # Export release build
-            godot --headless --export-release Android tankfighter.apk \
-              --verbose
+            echo "Exporting release build..."
+            godot --headless --export-release Android tankfighter.apk --verbose
           else
-            echo "No release keystore provided, exporting debug APK..."
-            # Export debug build (uses default debug.keystore)
-            godot --headless --export-debug Android tankfighter.apk \
-              --verbose
+            echo "Using debug export..."
+            godot --headless --export-debug Android tankfighter.apk --verbose
+          fi
+          echo "Export command completed"
+
+      - name: List files after export
+        run: |
+          echo "=== POST-EXPORT FILE LISTING ==="
+          echo "Current directory: $(pwd)"
+          echo "All files:"
+          find . -type f | sort
+          echo "=== APK SPECIFIC SEARCH ==="
+          APK_FILES=$(find . -name "*.apk" -type f)
+          if [ -z "$APK_FILES" ]; then
+            echo "No APK files found"
+          else
+            echo "Found APK files:"
+            echo "$APK_FILES"
+          fi
+
+      - name: Check for APK and upload
+        id: upload_check
+        run: |
+          echo "Checking for APK file..."
+          APK_FILE=$(find . -name "*.apk" -type f | head -1)
+          if [ -n "$APK_FILE" ]; then
+            echo "Found APK: $APK_FILE"
+            echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+          else
+            echo "No APK file found"
+            echo "apk_path=" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload APK as artifact
-        uses: actions/upload-artifact@v4
+        if: steps.upload_check.outputs.apk_path != ''
+        uses: actions/upload-artifact@v4.4.3
         with:
           name: tankfighter-android-apk
-          path: tankfighter.apk
+          path: ${{ steps.upload_check.outputs.apk_path }}
+
+      - name: Report missing APK
+        if: steps.upload_check.outputs.apk_path == ''
+        run: |
+          echo "ERROR: No APK file found to upload"
+          echo "Please check the export logs above for errors"
+          exit 1
