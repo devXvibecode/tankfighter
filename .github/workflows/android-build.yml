@@ -17,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install dependencies
         run: |
@@ -25,7 +27,9 @@ jobs:
             android-sdk-platform-tools \
             libc6 \
             libstdc++6 \
-            zlib1g
+            zlib1g \
+            wget \
+            unzip
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -36,6 +40,9 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          api-level: 33
+          build-tools: 33.0.0
 
       - name: Export Android Project
         env:
@@ -45,18 +52,19 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
+          # Link Godot executable for easier access
+          ln -s /usr/bin/godot /godot
+          
           # If keystore secrets are provided, use them for release build
           if [ -n "$ANDROID_KEYSTORE" ]; then
             echo "Setting up release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/keystore.jks
-            godot --headless --export-debug Android /godot/tankfighter.apk \
+            godot --headless --export-debug Android tankfighter.apk \
               --export-debug-template \
-              --path /godot/tankfighter \
               --verbose
           else
             echo "No keystore provided, exporting debug APK..."
-            godot --headless --export-debug Android /godot/tankfighter.apk \
-              --path /godot/tankfighter \
+            godot --headless --export-debug Android tankfighter.apk \
               --verbose
           fi
 
@@ -64,4 +72,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tankfighter-android-apk
-          path: /godot/tankfighter.apk
+          path: tankfighter.apk
