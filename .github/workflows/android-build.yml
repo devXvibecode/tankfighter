@@ -49,106 +49,35 @@ jobs:
       - name: Setup Godot and Export Templates
         run: |
           ln -s /usr/bin/godot /godot
-          
-          echo "Setting up Godot export templates..."
           mkdir -p "$HOME/.local/share/godot/templates"
-          
-          echo "Downloading export templates from GitHub releases..."
           wget -q --timeout=60 --tries=3 \
             https://github.com/godotengine/godot/releases/download/4.2.1-stable/Godot_v4.2.1-stable_export_templates.tpz \
+            -O /tmp/godot_templates.tpz || \
+          wget -q --timeout=60 --tries=3 \
+            https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz \
             -O /tmp/godot_templates.tpz
-          
-          if [ ! -f /tmp/godot_templates.tpz ]; then
-            echo "Failed to download from GitHub, trying mirror..."
-            wget -q --timeout=60 --tries=3 \
-              https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz \
-              -O /tmp/godot_templates.tpz
-          fi
-          
           if [ ! -f /tmp/godot_templates.tpz ]; then
             echo "ERROR: Failed to download export templates"
             exit 1
           fi
-          
-          echo "Extracting templates..."
-          cd /tmp
-          unzip -q godot_templates.tpz
-          rm -f godot_templates.tpz
-          
+          cd /tmp && unzip -q godot_templates.tpz && rm -f godot_templates.tpz
           if [ -d templates ]; then
             mv templates "$HOME/.local/share/godot/templates/4.2.1.stable"
           else
             echo "ERROR: Unexpected archive structure"
-            ls -la /tmp/
             exit 1
           fi
-          
-          echo "Export templates installed successfully"
+          echo "Export templates installed"
           ls -la "$HOME/.local/share/godot/templates/4.2.1.stable"
 
       - name: Generate export_presets.cfg
         run: |
-          echo "Generating export_presets.cfg..."
-          python3 -c "
-content = '''[preset.0]
-
-name=\"Android\"
-platform=\"Android\"
-runnable=true
-dedicated_server=false
-custom_features=\"\"
-export_filter=\"all_resources\"
-include_filter=\"\"
-exclude_filter=\"\"
-patches/Patch.0.enabled=false
-patches/Patch.0.name=\"Patch 0\"
-patches/Patch.0.version=\"1.0\"
-
-[preset.0.options]
-
-custom_package/debug=\"\"
-custom_package/release=\"\"
-apk_expansion/enable=false
-command_line=\"\"
-gradle_build/use_gradle_build=true
-gradle_build/export_format=0
-gradle_build/min_sdk_version=\"21\"
-gradle_build/target_sdk_version=\"33\"
-gradle_build/number_of_abis=2
-gradle_build/force_system_certs=false
-versions/linux_debian_arm64=false
-versions/linux_debian_arm32=false
-versions/linux_x86_64=false
-versions/windows_x86_64=false
-versions/macos=false
-versions/android=true
-keystore/debug=\"res://debug.keystore\"
-keystore/release=\"\"
-keystore/debug_password=\"android\"
-keystore/release_password=\"\"
-keystore/debug_user=\"androiddebugkey\"
-keystore/release_user=\"\"
-version/code=1
-version/name=\"1.0\"
-package/unique_name=\"org.godotengine.tankfighter\"
-package/signed=true
-screen/immersive_mode=true
-screen/orientation=\"portrait\"
-screen/handheld=true
-screen/tablet=false
-screen/tv=false
-'''
-          import os
-          path = os.environ['GITHUB_WORKSPACE'] + '/export_presets.cfg'
-          with open(path, 'w') as f:
-              f.write(content)
-          print('export_presets.cfg created at', path)
-          "
-          cat "$GITHUB_WORKSPACE/export_presets.cfg" | head -5
+          echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSIiCmN1c3RvbV9wYWNrYWdlL3JlbGVhc2U9IiIKYXBrX2V4cGFuc2lvbi9lbmFibGU9ZmFsc2UKYXBrX2V4cGFuc2lvbi9TM19yZWdpb249IiIKYXBrX2V4cGFuc2lvbi9TM19idWNrZXQ9IiIKYXBrX2V4cGFuc2lvbi9TM19hY2Nlc3Nfa2V5PSIiCmFwa19leHBhbnNpb24vUzNfc2VjcmV0X2tleT0iIgpjb21tYW5kX2xpbmU9IiIKZ3JhZGxlX2J1aWxkL3VzZV9ncmFkbGVfYnVpbGQ9dHJ1ZQpncmFkbGVfYnVpbGQvZXhwb3J0X2Zvcm1hdD0wCmdyYWRsZV9idWlsZC9taW5fc2RrX3ZlcnNpb249IjIxIgpncmFkbGVfYnVpbGQvdGFyZ2V0X3Nka192ZXJzaW9uPSIzMyIKZ3JhZGxlX2J1aWxkL251bWJlcl9vZl9hYmlzPTIKZ3JhZGxlX2J1aWxkL2ZvcmNlX3N5c3RlbV9jZXJ0cz1mYWxzZQp2ZXJzaW9ucy9saW51eF9kZWJpYW5fYXJtNjQ9ZmFsc2UKdmVyc2lvbnMvbGludXhfZGViaWFuX2FybTMyPWZhbHNlCnZlcnNpb25zL2xpbnV4X3g4Nl82ND1mYWxzZQp2ZXJzaW9ucy93aW5kb3dzX3g4Nl82ND1mYWxzZQp2ZXJzaW9ucy9tYWNvcz1mYWxzZQp2ZXJzaW9ucy9hbmRyb2lkPXRydWUKa2V5c3RvcmUvZGVidWc9InJlczovL2RlYnVnLmtleXN0b3JlIgprZXlzdG9yZS9yZWxlYXNlPSIiCmtleXN0b3JlL2RlYnVnX3Bhc3N3b3JkPSJhbmRyb2lkIgprZXlzdG9yZS9yZWxlYXNlX3Bhc3N3b3JkPSIiCmtleXN0b3JlL2RlYnVnX3VzZXI9ImFuZHJvaWRkZWJ1Z2tleSIKa2V5c3RvcmUvcmVsZWFzZV91c2VyPSIiCnZlcnNpb24vY29kZT0xCnZlcnNpb24vbmFtZT0iMS4wIgpwYWNrYWdlL3VuaXF1ZV9uYW1lPSJvcmcuZ29kb3RlbmdpbmUudGFua2ZpZ2h0ZXIiCnBhY2thZ2Uvc2lnbmVkPXRydWUKc2NyZWVuL2ltbWVyc2l2ZV9tb2RlPXRydWUKc2NyZWVuL29yaWVudGF0aW9uPSJwb3J0cmFpdCIKc2NyZWVuL2hhbmRoZWxkPXRydWUKc2NyZWVuL3RhYmxldD1mYWxzZQpzY3JlZW4vdHY9ZmFsc2UK' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
+          echo "export_presets.cfg created"
+          head -5 "$GITHUB_WORKSPACE/export_presets.cfg"
 
       - name: Generate debug keystore
         run: |
-          echo "Generating Android debug keystore..."
           keytool -genkey -v -keystore debug.keystore \
             -storepass android \
             -alias androiddebugkey \
@@ -167,7 +96,6 @@ screen/tv=false
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "Starting Android export..."
-          
           if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "Using release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
@@ -176,16 +104,12 @@ screen/tv=false
             echo "Using debug export..."
             godot --headless --export-debug Android "$GITHUB_WORKSPACE/tankfighter.apk" --verbose 2>&1
           fi
-          
           EXIT_CODE=$?
           echo "Godot exit code: $EXIT_CODE"
-          
           if [ $EXIT_CODE -ne 0 ]; then
             echo "ERROR: Godot export failed with exit code $EXIT_CODE"
             exit $EXIT_CODE
           fi
-          
-          echo "Checking for APK file..."
           if [ -f "$GITHUB_WORKSPACE/tankfighter.apk" ]; then
             echo "APK found at $GITHUB_WORKSPACE/tankfighter.apk"
             ls -la "$GITHUB_WORKSPACE/tankfighter.apk"
@@ -194,20 +118,11 @@ screen/tv=false
             ls -la tankfighter.apk
           else
             echo "APK not found. Searching..."
-            find "$GITHUB_WORKSPACE" -name "*.apk" -type f 2>/dev/null
-            find / -name "*.apk" -type f 2>/dev/null | head -10
-            echo "ERROR: No APK was produced by the export"
+            find "$GITHUB_WORKSPACE" -name "*.apk" -type f 2>/dev/null || echo "No APK in workspace"
+            echo "ERROR: No APK was produced"
             exit 1
           fi
-          
           echo "Export completed successfully"
-
-      - name: List files after export
-        run: |
-          echo "=== POST-EXPORT FILE LISTING ==="
-          ls -la
-          echo "=== APK FILES ==="
-          find . -name "*.apk" -type f || echo "No APK files found"
 
       - name: Check for APK and upload
         id: upload_check
@@ -232,5 +147,4 @@ screen/tv=false
         if: steps.upload_check.outputs.apk_path == ''
         run: |
           echo "ERROR: No APK file found to upload"
-          echo "Please check the export logs above for errors"
           exit 1
