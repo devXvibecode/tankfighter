@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: flashlight13/godot:4.2.1
+      image: flashlight13/godot:4.4
       options: --user root
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -58,10 +58,10 @@ jobs:
           
           echo "Downloading export templates..."
           wget -q --timeout=60 --tries=3 \
-            https://github.com/godotengine/godot/releases/download/4.2.1-stable/Godot_v4.2.1-stable_export_templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.4-stable/Godot_v4.4-stable_export_templates.tpz \
             -O /tmp/godot_templates.tpz || \
           wget -q --timeout=60 --tries=3 \
-            https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz \
+            https://downloads.tuxfamily.org/godotengine/4.4/Godot_v4.4-stable_export_templates.tpz \
             -O /tmp/godot_templates.tpz
           
           if [ ! -f /tmp/godot_templates.tpz ]; then
@@ -76,12 +76,12 @@ jobs:
           fi
           
           mkdir -p "$HOME/.local/share/godot/export_templates"
-          cp -r templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
+          cp -r templates "$HOME/.local/share/godot/export_templates/4.4.stable"
           
-          echo "Global templates installed at $HOME/.local/share/godot/export_templates/4.2.1.stable/"
+          echo "Global templates installed at $HOME/.local/share/godot/export_templates/4.4.stable/"
           
           mkdir -p "$GITHUB_WORKSPACE/android/build"
-          unzip -q "$HOME/.local/share/godot/export_templates/4.2.1.stable/android_source.zip" \
+          unzip -q "$HOME/.local/share/godot/export_templates/4.4.stable/android_source.zip" \
             -d "$GITHUB_WORKSPACE/android/build/"
           echo "Project template extracted to $GITHUB_WORKSPACE/android/build/"
           ls -la "$GITHUB_WORKSPACE/android/build/" | head -10
