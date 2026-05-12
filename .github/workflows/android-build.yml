@@ -79,7 +79,8 @@ jobs:
           fi
           
           # Install templates to both possible paths (Godot might look in either)
-          mkdir -p "$HOME/.local/share/godot/{export_templates,templates}"
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          mkdir -p "$HOME/.local/share/godot/templates"
           cp -r templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
           cp -r templates "$HOME/.local/share/godot/templates/4.2.1.stable"
           
