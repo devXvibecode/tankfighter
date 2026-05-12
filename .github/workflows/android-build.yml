@@ -37,27 +37,29 @@ jobs:
         run: |
           curl -fsSL -o /tmp/godot.zip \
             https://github.com/godotengine/godot/releases/download/4.2.1-stable/Godot_v4.2.1-stable_linux.x86_64.zip
-          unzip -q /tmp/godot.zip -d /tmp/godot
+          unzip -o -q /tmp/godot.zip -d /tmp/godot
           sudo cp /tmp/godot/Godot_v4.2.1-stable_linux.x86_64 /usr/local/bin/godot
           sudo chmod +x /usr/local/bin/godot
           
           curl -fsSL -o /tmp/godot_templates.tpz \
             https://github.com/godotengine/godot/releases/download/4.2.1-stable/Godot_v4.2.1-stable_export_templates.tpz
-          cd /tmp && unzip -q godot_templates.tpz && rm -f godot_templates.tpz
+          cd /tmp && unzip -o -q godot_templates.tpz && rm -f godot_templates.tpz
           mkdir -p "$HOME/.local/share/godot/export_templates"
           mv templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
           
           sudo mkdir -p "$ANDROID_SDK_ROOT"
           curl -fsSL -o /tmp/cmdline-tools.zip \
             https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
-          sudo unzip -q /tmp/cmdline-tools.zip -d /tmp/
-          sudo mv /tmp/cmdline-tools "$ANDROID_SDK_ROOT/cmdline-tools"
+          sudo unzip -o -q /tmp/cmdline-tools.zip -d "$ANDROID_SDK_ROOT/"
+          ls -la "$ANDROID_SDK_ROOT/"
+          sudo mv "$ANDROID_SDK_ROOT/cmdline-tools" "$ANDROID_SDK_ROOT/latest" 2>/dev/null || true
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          sudo mv "$ANDROID_SDK_ROOT/latest" "$ANDROID_SDK_ROOT/cmdline-tools/latest" 2>/dev/null || true
+          ls -la "$ANDROID_SDK_ROOT/cmdline-tools/"
           
-          sudo mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-          sudo mv /tmp/cmdline-tools "$ANDROID_SDK_ROOT/cmdline-tools/latest"
           echo "y" | sudo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-33" \
-            "build-tools;33.0.0" 2>&1 | tail -3
+            "build-tools;33.0.0" 2>&1 | tail -5
           sudo chmod -R 755 "$ANDROID_SDK_ROOT"
 
       - name: Export APK
