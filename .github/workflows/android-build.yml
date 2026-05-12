@@ -16,6 +16,7 @@ jobs:
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       timeout-minutes: 30
+      ANDROID_HOME: /github/home/.android/sdk
 
     steps:
       - name: Checkout code
@@ -27,7 +28,7 @@ jobs:
         run: |
           apt-get update && apt-get install -y \
             openjdk-17-jdk \
-            android-sdk-platform-tools \
+            android-sdk-platform-tools-common \
             libc6 \
             libstdc++6 \
             zlib1g \
@@ -42,14 +43,22 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3.1.0
-        with:
-          api-level: 33
-          build-tools: 33.0.0
+
+      - name: Install Android SDK components
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/11.0/bin/sdkmanager" \
+            "platforms;android-33" \
+            "build-tools;33.0.0" \
+            --sdk_root="$ANDROID_HOME"
+          echo "SDK tools installed:"
+          ls -la "$ANDROID_HOME/platforms/" 2>/dev/null
+          ls -la "$ANDROID_HOME/build-tools/" 2>/dev/null
 
       - name: Setup Godot and Export Templates
         run: |
           ln -s /usr/bin/godot /godot
-          mkdir -p "$HOME/.local/share/godot/templates"
+          echo "Downloading export templates..."
+          mkdir -p "$HOME/.local/share/godot"
           wget -q --timeout=60 --tries=3 \
             https://github.com/godotengine/godot/releases/download/4.2.1-stable/Godot_v4.2.1-stable_export_templates.tpz \
             -O /tmp/godot_templates.tpz || \
@@ -62,18 +71,18 @@ jobs:
           fi
           cd /tmp && unzip -q godot_templates.tpz && rm -f godot_templates.tpz
           if [ -d templates ]; then
-            mv templates "$HOME/.local/share/godot/templates/4.2.1.stable"
+            mkdir -p "$HOME/.local/share/godot/export_templates"
+            mv templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
           else
             echo "ERROR: Unexpected archive structure"
             exit 1
           fi
-          echo "Export templates installed"
-          ls -la "$HOME/.local/share/godot/templates/4.2.1.stable"
+          echo "Export templates installed:"
+          ls -la "$HOME/.local/share/godot/export_templates/4.2.1.stable"
 
       - name: Generate export_presets.cfg
         run: |
           echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSIiCmN1c3RvbV9wYWNrYWdlL3JlbGVhc2U9IiIKYXBrX2V4cGFuc2lvbi9lbmFibGU9ZmFsc2UKYXBrX2V4cGFuc2lvbi9TM19yZWdpb249IiIKYXBrX2V4cGFuc2lvbi9TM19idWNrZXQ9IiIKYXBrX2V4cGFuc2lvbi9TM19hY2Nlc3Nfa2V5PSIiCmFwa19leHBhbnNpb24vUzNfc2VjcmV0X2tleT0iIgpjb21tYW5kX2xpbmU9IiIKZ3JhZGxlX2J1aWxkL3VzZV9ncmFkbGVfYnVpbGQ9dHJ1ZQpncmFkbGVfYnVpbGQvZXhwb3J0X2Zvcm1hdD0wCmdyYWRsZV9idWlsZC9taW5fc2RrX3ZlcnNpb249IjIxIgpncmFkbGVfYnVpbGQvdGFyZ2V0X3Nka192ZXJzaW9uPSIzMyIKZ3JhZGxlX2J1aWxkL251bWJlcl9vZl9hYmlzPTIKZ3JhZGxlX2J1aWxkL2ZvcmNlX3N5c3RlbV9jZXJ0cz1mYWxzZQp2ZXJzaW9ucy9saW51eF9kZWJpYW5fYXJtNjQ9ZmFsc2UKdmVyc2lvbnMvbGludXhfZGViaWFuX2FybTMyPWZhbHNlCnZlcnNpb25zL2xpbnV4X3g4Nl82ND1mYWxzZQp2ZXJzaW9ucy93aW5kb3dzX3g4Nl82ND1mYWxzZQp2ZXJzaW9ucy9tYWNvcz1mYWxzZQp2ZXJzaW9ucy9hbmRyb2lkPXRydWUKa2V5c3RvcmUvZGVidWc9InJlczovL2RlYnVnLmtleXN0b3JlIgprZXlzdG9yZS9yZWxlYXNlPSIiCmtleXN0b3JlL2RlYnVnX3Bhc3N3b3JkPSJhbmRyb2lkIgprZXlzdG9yZS9yZWxlYXNlX3Bhc3N3b3JkPSIiCmtleXN0b3JlL2RlYnVnX3VzZXI9ImFuZHJvaWRkZWJ1Z2tleSIKa2V5c3RvcmUvcmVsZWFzZV91c2VyPSIiCnZlcnNpb24vY29kZT0xCnZlcnNpb24vbmFtZT0iMS4wIgpwYWNrYWdlL3VuaXF1ZV9uYW1lPSJvcmcuZ29kb3RlbmdpbmUudGFua2ZpZ2h0ZXIiCnBhY2thZ2Uvc2lnbmVkPXRydWUKc2NyZWVuL2ltbWVyc2l2ZV9tb2RlPXRydWUKc2NyZWVuL29yaWVudGF0aW9uPSJwb3J0cmFpdCIKc2NyZWVuL2hhbmRoZWxkPXRydWUKc2NyZWVuL3RhYmxldD1mYWxzZQpzY3JlZW4vdHY9ZmFsc2UK' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
-          echo "export_presets.cfg created"
           head -5 "$GITHUB_WORKSPACE/export_presets.cfg"
 
       - name: Generate debug keystore
