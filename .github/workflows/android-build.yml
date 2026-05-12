@@ -15,15 +15,6 @@ jobs:
       options: --user root
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-      # Critical environment variables for headless Godot operation
-      DISPLAY: :99
-      # Prevent Godot from trying to access hardware or show windows
-      HEADLESS: 1
-      EDITOR_DISABLED: 1
-      # Use wayland backend which works better in headless containers
-      GDK_BACKEND: wayland
-      # Timeout for godot commands (in seconds) - prevents hanging
-      GODOT_COMMAND_TIMEOUT: 120
       timeout-minutes: 30
 
     steps:
@@ -41,9 +32,7 @@ jobs:
             libstdc++6 \
             zlib1g \
             wget \
-            unzip \
-            xvfb \
-            dbus-x11  # Essential for proper session management
+            unzip
 
       - name: Set up Java
         uses: actions/setup-java@v4.7.0
@@ -56,101 +45,53 @@ jobs:
 
       - name: Setup Godot Export Templates
         run: |
-          # Link Godot executable
           ln -s /usr/bin/godot /godot
           
-          echo "Starting Godot export template installation..."
+          echo "Setting up Godot export templates..."
+          mkdir -p "$HOME/.local/share/godot/templates"
           
-          # Create .local directory if it doesn't exist
-          mkdir -p "$HOME/.local/share"
+          echo "Downloading export templates from GitHub releases..."
+          wget -q --timeout=60 --tries=3 \
+            https://github.com/godotengine/godot/releases/download/4.2.1-stable/Godot_v4.2.1-stable_export_templates.tpz \
+            -O /tmp/godot_templates.tpz
           
-          # Method 1: Try using xvfb with dbus and timeout
-          echo "Attempting template installation with xvfb and timeout..."
-          if dbus-launch --exit-with-session \
-             xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24:0" \
-             timeout "$GODOT_COMMAND_TIMEOUT" godot --headless --verbose --install-templates; then
-            echo "✓ Template installation successful via xvfb method"
-          else
-            echo "✗ xvfb method failed, trying direct headless approach..."
-            
-            # Method 2: Try with explicit headless flags and environment
-            if HEADLESS=1 EDITOR_DISABLED=1 timeout "$GODOT_COMMAND_TIMEOUT" \
-               godot --headless --verbose --install-templates; then
-              echo "✓ Template installation successful via direct headless method"
-            else
-              echo "✗ Both automatic methods failed, using manual download..."
-              
-              # Method 3: Manual download and installation (most reliable)
-              mkdir -p "$HOME/.local/share/godot/templates"
-              cd "$HOME/.local/share/godot/templates"
-              
-              echo "Downloading export templates from official Godot mirror..."
-              # Try multiple mirrors without using bash arrays
-              MIRROR_1="https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
-              MIRROR_2="https://mirror.godotengine.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
-              
-              DOWNLOAD_SUCCESS=0
-              for MIRROR in "$MIRROR_1" "$MIRROR_2"; do
-                echo "Trying mirror: $MIRROR"
-                if wget --timeout=30 --tries=2 "$MIRROR" -O godot_templates.tpz; then
-                  DOWNLOAD_SUCCESS=1
-                  break
-                fi
-              done
-              
-              if [ $DOWNLOAD_SUCCESS -eq 0 ]; then
-                echo "✗ Failed to download export templates from all mirrors"
-                exit 1
-              fi
-              
-              echo "Extracting templates..."
-              if unzip -q godot_templates.tpz; then
-                # The tpz file contains a 'templates' directory that needs to be versioned
-                if [ -d "templates" ]; then
-                  mv templates 4.2.1.stable
-                  echo "✓ Templates installed via download method"
-                else
-                  # Find what was actually extracted
-                  for dir in */; do
-                    if [ -d "$dir" ] && [ "$dir" != "./" ]; then
-                      mv "$dir" 4.2.1.stable
-                      echo "✓ Renamed extracted directory to 4.2.1.stable"
-                      break
-                    fi
-                  done
-                fi
-                rm -f godot_templates.tpz
-              else
-                echo "✗ Failed to extract export templates"
-                exit 1
-              fi
-            fi
+          if [ ! -f /tmp/godot_templates.tpz ]; then
+            echo "Failed to download from GitHub, trying mirror..."
+            wget -q --timeout=60 --tries=3 \
+              https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz \
+              -O /tmp/godot_templates.tpz
           fi
           
-          # Final verification
-          echo "Verifying template installation..."
-          if [ -d "$HOME/.local/share/godot/templates/4.2.1.stable" ]; then
-            echo "✓ Export templates verified at: $HOME/.local/share/godot/templates/4.2.1.stable"
-            ls -la "$HOME/.local/share/godot/templates/4.2.1.stable"
-          else
-            echo "✗ ERROR: Export templates not found after installation attempts"
-            echo "Contents of $HOME/.local/share/godot/templates/:"
-            ls -la "$HOME/.local/share/godot/templates/"
+          if [ ! -f /tmp/godot_templates.tpz ]; then
+            echo "ERROR: Failed to download export templates from all sources"
             exit 1
           fi
+          
+          echo "Extracting templates..."
+          cd /tmp
+          unzip -q godot_templates.tpz
+          rm -f godot_templates.tpz
+          
+          if [ -d templates ]; then
+            mv templates "$HOME/.local/share/godot/templates/4.2.1.stable"
+          else
+            echo "ERROR: Unexpected archive structure after extraction"
+            ls -la /tmp/
+            exit 1
+          fi
+          
+          echo "Export templates installed successfully"
+          ls -la "$HOME/.local/share/godot/templates/4.2.1.stable"
 
       - name: Verify Godot and Android Setup
         run: |
           echo "Godot version:"
           godot --version
-          echo "Android debug keystore exists: [[ -f debug.keystore ]] && echo 'yes' || echo 'no'"
           ls -la debug.keystore 2>/dev/null || echo "Keystore not found"
 
       - name: List files before export
         run: |
           echo "=== PRE-EXPORT FILE LISTING ==="
-          echo "Current directory: $(pwd)"
-          echo "Files in current directory:"
           ls -la
 
       - name: Export Android Project (Debug)
@@ -162,25 +103,13 @@ jobs:
         run: |
           echo "Starting Android export..."
           
-          # Determine export type
           if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "Using release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
-            EXPORT_TYPE="--export-release"
+            godot --headless --export-release Android tankfighter.apk --verbose
           else
             echo "Using debug export..."
-            EXPORT_TYPE="--export-debug"
-          fi
-          
-          # Run export with proper headless environment and timeout
-          echo "Running Godot export with timeout and headless settings..."
-          if dbus-launch --exit-with-session \
-             xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24:0" \
-             timeout "$GODOT_COMMAND_TIMEOUT" godot --headless --verbose $EXPORT_TYPE Android tankfighter.apk; then
-            echo "✓ Android export completed successfully"
-          else
-            echo "✗ Android export failed"
-            exit 1
+            godot --headless --export-debug Android tankfighter.apk --verbose
           fi
           
           echo "Export command completed"
@@ -188,29 +117,20 @@ jobs:
       - name: List files after export
         run: |
           echo "=== POST-EXPORT FILE LISTING ==="
-          echo "Current directory: $(pwd)"
-          echo "All files:"
           find . -type f | sort
-          echo "=== APK SPECIFIC SEARCH ==="
-          APK_FILES=$(find . -name "*.apk" -type f)
-          if [ -z "$APK_FILES" ]; then
-            echo "No APK files found"
-          else
-            echo "Found APK files:"
-            echo "$APK_FILES"
-          fi
+          echo "=== APK FILES ==="
+          find . -name "*.apk" -type f || echo "No APK files found"
 
       - name: Check for APK and upload
         id: upload_check
         run: |
-          echo "Checking for APK file..."
           APK_FILE=$(find . -name "*.apk" -type f | head -1)
           if [ -n "$APK_FILE" ]; then
             echo "Found APK: $APK_FILE"
-            echo "apk_path=$APK_FILE" >> $GITHUB_OUTPUT
+            echo "apk_path=$APK_FILE" >> "$GITHUB_OUTPUT"
           else
             echo "No APK file found"
-            echo "apk_path=" >> $GITHUB_OUTPUT
+            echo "apk_path=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Upload APK as artifact
