@@ -50,11 +50,8 @@ jobs:
             "platforms;android-33" \
             "build-tools;33.0.0" \
             --sdk_root="$ANDROID_HOME" 2>&1 | tail -5
-          echo "SDK tools:"
-          ls -la "$ANDROID_HOME/platforms/"
-          ls -la "$ANDROID_HOME/build-tools/"
 
-      - name: Install export templates
+      - name: Prepare Android project
         run: |
           ln -s /usr/bin/godot /godot
           
@@ -67,31 +64,33 @@ jobs:
             -O /tmp/godot_templates.tpz
           
           if [ ! -f /tmp/godot_templates.tpz ]; then
-            echo "ERROR: Failed to download export templates"
+            echo "ERROR: Failed to download"
             exit 1
           fi
           
           cd /tmp && unzip -q godot_templates.tpz && rm -f godot_templates.tpz
           
           if [ ! -d templates ]; then
-            echo "ERROR: templates directory not found after extraction"
+            echo "ERROR: templates dir not found"
             exit 1
           fi
           
-          # Install templates to both possible paths (Godot might look in either)
+          # Install global templates
           mkdir -p "$HOME/.local/share/godot/export_templates"
-          mkdir -p "$HOME/.local/share/godot/templates"
           cp -r templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
-          cp -r templates "$HOME/.local/share/godot/templates/4.2.1.stable"
           
-          echo "Templates installed:"
-          ls -la "$HOME/.local/share/godot/export_templates/4.2.1.stable" | head -5
-          echo "---"
-          ls -la "$HOME/.local/share/godot/templates/4.2.1.stable" | head -5
+          # Extract Android source template into the project
+          echo "Extracting Android build template into project..."
+          mkdir -p "$GITHUB_WORKSPACE/android"
+          unzip -q "$HOME/.local/share/godot/export_templates/4.2.1.stable/android_source.zip" \
+            -d "$GITHUB_WORKSPACE/android/"
+          echo "Android build template extracted to $GITHUB_WORKSPACE/android/"
+          ls -la "$GITHUB_WORKSPACE/android/"
 
-      - name: Generate project config files
+      - name: Generate config and keystore
         run: |
-          echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSIiCmN1c3RvbV9wYWNrYWdlL3JlbGVhc2U9IiIKYXBrX2V4cGFuc2lvbi9lbmFibGU9ZmFsc2UKY29tbWFuZF9saW5lPSIiCmdyYWRsZV9idWlsZC91c2VfZ3JhZGxlX2J1aWxkPXRydWUKZ3JhZGxlX2J1aWxkL2V4cG9ydF9mb3JtYXQ9MApncmFkbGVfYnVpbGQvbWluX3Nka192ZXJzaW9uPSIyMSIKZ3JhZGxlX2J1aWxkL3RhcmdldF9zZGtfdmVyc2lvbj0iMzMiCmdyYWRsZV9idWlsZC9udW1iZXJfb2ZfYWJpcz0yCmdyYWRsZV9idWlsZC9mb3JjZV9zeXN0ZW1fY2VydHM9ZmFsc2UKdmVyc2lvbnMvbGludXhfZGViaWFuX2FybTY0PWZhbHNlCnZlcnNpb25zL2xpbnV4X2RlYmlhbl9hcm0zMj1mYWxzZQp2ZXJzaW9ucy9saW51eF94ODZfNjQ9ZmFsc2UKdmVyc2lvbnMvd2luZG93c194ODZfNjQ9ZmFsc2UKdmVyc2lvbnMvbWFjb3M9ZmFsc2UKdmVyc2lvbnMvYW5kcm9pZD10cnVlCmtleXN0b3JlL2RlYnVnPSJyZXM6Ly9kZWJ1Zy5rZXlzdG9yZSIKa2V5c3RvcmUvcmVsZWFzZT0iIgprZXlzdG9yZS9kZWJ1Z19wYXNzd29yZD0iYW5kcm9pZCIKa2V5c3RvcmUvcmVsZWFzZV9wYXNzd29yZD0iIgprZXlzdG9yZS9kZWJ1Z191c2VyPSJhbmRyb2lkZGVidWdrZXkiCmtleXN0b3JlL3JlbGVhc2VfdXNlcj0iIgp2ZXJzaW9uL2NvZGU9MQp2ZXJzaW9uL25hbWU9IjEuMCIKcGFja2FnZS91bmlxdWVfbmFtZT0ib3JnLmdvZG90ZW5naW5lLnRhbmtmaWdodGVyIgpwYWNrYWdlL3NpZ25lZD10cnVlCnNjcmVlbi9pbW1lcnNpdmVfbW9kZT10cnVlCnNjcmVlbi9vcmllbnRhdGlvbj0icG9ydHJhaXQiCnNjcmVlbi9oYW5kaGVsZD10cnVlCnNjcmVlbi90YWJsZXQ9ZmFsc2UKc2NyZWVuL3R2PWZhbHNlCg==' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
+          # Generate export_presets.cfg with custom_package pointing to local android/ dir
+          echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSJyZXM6Ly9hbmRyb2lkLyIKY3VzdG9tX3BhY2thZ2UvcmVsZWFzZT0icmVzOi8vYW5kcm9pZC8iCmFwa19leHBhbnNpb24vZW5hYmxlPWZhbHNlCmNvbW1hbmRfbGluZT0iIgpncmFkbGVfYnVpbGQvdXNlX2dyYWRsZV9idWlsZD10cnVlCmdyYWRsZV9idWlsZC9leHBvcnRfZm9ybWF0PTAKZ3JhZGxlX2J1aWxkL21pbl9zZGtfdmVyc2lvbj0iMjEiCmdyYWRsZV9idWlsZC90YXJnZXRfc2RrX3ZlcnNpb249IjMzIgpncmFkbGVfYnVpbGQvbnVtYmVyX29mX2FiaXM9MgpncmFkbGVfYnVpbGQvZm9yY2Vfc3lzdGVtX2NlcnRzPWZhbHNlCnZlcnNpb25zL2xpbnV4X2RlYmlhbl9hcm02ND1mYWxzZQp2ZXJzaW9ucy9saW51eF9kZWJpYW5fYXJtMzI9ZmFsc2UKdmVyc2lvbnMvbGludXhfeDg2XzY0PWZhbHNlCnZlcnNpb25zL3dpbmRvd3NfeDg2XzY0PWZhbHNlCnZlcnNpb25zL21hY29zPWZhbHNlCnZlcnNpb25zL2FuZHJvaWQ9dHJ1ZQprZXlzdG9yZS9kZWJ1Zz0icmVzOi8vZGVidWcua2V5c3RvcmUiCmtleXN0b3JlL3JlbGVhc2U9IiIKa2V5c3RvcmUvZGVidWdfcGFzc3dvcmQ9ImFuZHJvaWQiCmtleXN0b3JlL3JlbGVhc2VfcGFzc3dvcmQ9IiIKa2V5c3RvcmUvZGVidWdfdXNlcj0iYW5kcm9pZGRlYnVna2V5IgprZXlzdG9yZS9yZWxlYXNlX3VzZXI9IiIKdmVyc2lvbi9jb2RlPTEKdmVyc2lvbi9uYW1lPSIxLjAiCnBhY2thZ2UvdW5pcXVlX25hbWU9Im9yZy5nb2RvdGVuZ2luZS50YW5rZmlnaHRlciIKcGFja2FnZS9zaWduZWQ9dHJ1ZQpzY3JlZW4vaW1tZXJzaXZlX21vZGU9dHJ1ZQpzY3JlZW4vb3JpZW50YXRpb249InBvcnRyYWl0IgpzY3JlZW4vaGFuZGhlbGQ9dHJ1ZQpzY3JlZW4vdGFibGV0PWZhbHNlCnNjcmVlbi90dj1mYWxzZQo=' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
           
           keytool -genkey -v -keystore "$GITHUB_WORKSPACE/debug.keystore" \
             -storepass android \
@@ -102,9 +101,8 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
           
-          echo "Files ready:"
+          echo "Config ready:"
           head -3 "$GITHUB_WORKSPACE/export_presets.cfg"
-          ls -la "$GITHUB_WORKSPACE/debug.keystore"
 
       - name: Export Android APK
         env:
@@ -114,7 +112,6 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           cd "$GITHUB_WORKSPACE"
-          echo "Starting export..."
           
           if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
@@ -125,13 +122,13 @@ jobs:
           
           EC=$?
           echo "Exit code: $EC"
-          if [ $EC -ne 0 ]; then exit $EC; fi
-          if [ ! -f tankfighter.apk ]; then
-            find / -name "*.apk" -type f 2>/dev/null
-            echo "No APK produced"
-            exit 1
+          if [ $EC -ne 0 ]; then
+            echo "Export failed"; exit $EC
           fi
-          echo "APK ready:" && ls -la tankfighter.apk
+          if [ ! -f tankfighter.apk ]; then
+            echo "No APK produced"; exit 1
+          fi
+          ls -la tankfighter.apk
 
       - name: Upload APK
         if: success()
