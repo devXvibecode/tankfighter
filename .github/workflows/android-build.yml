@@ -11,6 +11,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    env:
+      ANDROID_HOME: /usr/local/lib/android/sdk
+      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
 
     steps:
       - name: Checkout code
@@ -44,16 +47,18 @@ jobs:
           mkdir -p "$HOME/.local/share/godot/export_templates"
           mv templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
           
+          sudo mkdir -p "$ANDROID_SDK_ROOT"
           curl -fsSL -o /tmp/cmdline-tools.zip \
             https://dl.google.com/android/repository/commandlinetools-linux-10406996_latest.zip
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-          unzip -q /tmp/cmdline-tools.zip -d /tmp/
-          mv /tmp/cmdline-tools "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          sudo unzip -q /tmp/cmdline-tools.zip -d /tmp/
+          sudo mv /tmp/cmdline-tools "$ANDROID_SDK_ROOT/cmdline-tools"
           
-          yes | "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
+          sudo mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+          sudo mv /tmp/cmdline-tools "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+          echo "y" | sudo "$ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" \
             "platforms;android-33" \
             "build-tools;33.0.0" 2>&1 | tail -3
-          echo "Setup complete"
+          sudo chmod -R 755 "$ANDROID_SDK_ROOT"
 
       - name: Export APK
         run: |
@@ -66,23 +71,21 @@ jobs:
           
           echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSIiCmN1c3RvbV9wYWNrYWdlL3JlbGVhc2U9IiIKYXBrX2V4cGFuc2lvbi9lbmFibGU9ZmFsc2UKY29tbWFuZF9saW5lPSIiCmdyYWRsZV9idWlsZC91c2VfZ3JhZGxlX2J1aWxkPXRydWUKZ3JhZGxlX2J1aWxkL2V4cG9ydF9mb3JtYXQ9MApncmFkbGVfYnVpbGQvbWluX3Nka192ZXJzaW9uPSIyMSIKZ3JhZGxlX2J1aWxkL3RhcmdldF9zZGtfdmVyc2lvbj0iMzMiCmdyYWRsZV9idWlsZC9udW1iZXJfb2ZfYWJpcz0yCmdyYWRsZV9idWlsZC9mb3JjZV9zeXN0ZW1fY2VydHM9ZmFsc2UKdmVyc2lvbnMvbGludXhfZGViaWFuX2FybTY0PWZhbHNlCnZlcnNpb25zL2xpbnV4X2RlYmlhbl9hcm0zMj1mYWxzZQp2ZXJzaW9ucy9saW51eF94ODZfNjQ9ZmFsc2UKdmVyc2lvbnMvd2luZG93c194ODZfNjQ9ZmFsc2UKdmVyc2lvbnMvbWFjb3M9ZmFsc2UKdmVyc2lvbnMvYW5kcm9pZD10cnVlCmtleXN0b3JlL2RlYnVnPSJyZXM6Ly9kZWJ1Zy5rZXlzdG9yZSIKa2V5c3RvcmUvcmVsZWFzZT0iIgprZXlzdG9yZS9kZWJ1Z19wYXNzd29yZD0iYW5kcm9pZCIKa2V5c3RvcmUvcmVsZWFzZV9wYXNzd29yZD0iIgprZXlzdG9yZS9kZWJ1Z191c2VyPSJhbmRyb2lkZGVidWdrZXkiCmtleXN0b3JlL3JlbGVhc2VfdXNlcj0iIgp2ZXJzaW9uL2NvZGU9MQp2ZXJzaW9uL25hbWU9IjEuMCIKcGFja2FnZS91bmlxdWVfbmFtZT0ib3JnLmdvZG90ZW5naW5lLnRhbmtmaWdodGVyIgpwYWNrYWdlL3NpZ25lZD10cnVlCnNjcmVlbi9pbW1lcnNpdmVfbW9kZT10cnVlCnNjcmVlbi9vcmllbnRhdGlvbj0icG9ydHJhaXQiCnNjcmVlbi9oYW5kaGVsZD10cnVlCnNjcmVlbi90YWJsZXQ9ZmFsc2UKc2NyZWVuL3R2PWZhbHNlCg==' | base64 -d > export_presets.cfg
           
-          echo "Pre-importing assets..."
-          xvfb-run -a godot --editor --quit --headless --verbose 2>&1 || true
+          echo "=== Pre-import step ==="
+          xvfb-run -a godot --editor --quit --headless --verbose 2>&1 | head -20
           
-          echo "Exporting APK (first attempt)..."
-          xvfb-run -a godot --headless --export-debug Android tankfighter.apk --verbose 2>&1 || true
+          echo "=== Export pass 1 ==="
+          xvfb-run -a godot --headless --export-debug Android tankfighter.apk --verbose 2>&1 | head -30 || true
+          
+          echo "=== Export pass 2 ==="
+          xvfb-run -a godot --headless --export-debug Android tankfighter.apk --verbose 2>&1 | head -30 || true
           
           if [ -f tankfighter.apk ]; then
             echo "APK found!"; ls -la tankfighter.apk; exit 0
-          fi
-          
-          echo "Exporting APK (second attempt)..."
-          xvfb-run -a godot --headless --export-debug Android tankfighter.apk --verbose 2>&1
-          
-          if [ -f tankfighter.apk ]; then
-            echo "APK found!"; ls -la tankfighter.apk
           else
-            echo "No APK produced"; exit 1
+            echo "No APK produced"
+            ls -la
+            exit 1
           fi
 
       - name: Upload APK
