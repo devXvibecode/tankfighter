@@ -102,6 +102,13 @@ jobs:
           head -3 "$GITHUB_WORKSPACE/export_presets.cfg"
           ls -la "$GITHUB_WORKSPACE/debug.keystore"
 
+      - name: Import project assets
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          echo "Pre-importing assets..."
+          godot --headless --import . --verbose 2>&1
+          echo "Import complete"
+
       - name: Export Android APK
         env:
           ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
