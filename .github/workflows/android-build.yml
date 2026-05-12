@@ -17,6 +17,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       timeout-minutes: 30
       ANDROID_HOME: /github/home/.android/sdk
+      HOME: /github/home
 
     steps:
       - name: Checkout code
@@ -69,28 +70,25 @@ jobs:
           fi
           
           cd /tmp && unzip -q godot_templates.tpz && rm -f godot_templates.tpz
-          
           if [ ! -d templates ]; then
             echo "ERROR: templates dir not found"
             exit 1
           fi
           
-          # Install global templates
           mkdir -p "$HOME/.local/share/godot/export_templates"
           cp -r templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
           
-          # Extract Android source template into the project
-          echo "Extracting Android build template into project..."
-          mkdir -p "$GITHUB_WORKSPACE/android"
+          echo "Global templates installed at $HOME/.local/share/godot/export_templates/4.2.1.stable/"
+          
+          mkdir -p "$GITHUB_WORKSPACE/android/build"
           unzip -q "$HOME/.local/share/godot/export_templates/4.2.1.stable/android_source.zip" \
-            -d "$GITHUB_WORKSPACE/android/"
-          echo "Android build template extracted to $GITHUB_WORKSPACE/android/"
-          ls -la "$GITHUB_WORKSPACE/android/"
+            -d "$GITHUB_WORKSPACE/android/build/"
+          echo "Project template extracted to $GITHUB_WORKSPACE/android/build/"
+          ls -la "$GITHUB_WORKSPACE/android/build/" | head -10
 
-      - name: Generate config and keystore
+      - name: Generate config files
         run: |
-          # Generate export_presets.cfg with custom_package pointing to local android/ dir
-          echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSJyZXM6Ly9hbmRyb2lkLyIKY3VzdG9tX3BhY2thZ2UvcmVsZWFzZT0icmVzOi8vYW5kcm9pZC8iCmFwa19leHBhbnNpb24vZW5hYmxlPWZhbHNlCmNvbW1hbmRfbGluZT0iIgpncmFkbGVfYnVpbGQvdXNlX2dyYWRsZV9idWlsZD10cnVlCmdyYWRsZV9idWlsZC9leHBvcnRfZm9ybWF0PTAKZ3JhZGxlX2J1aWxkL21pbl9zZGtfdmVyc2lvbj0iMjEiCmdyYWRsZV9idWlsZC90YXJnZXRfc2RrX3ZlcnNpb249IjMzIgpncmFkbGVfYnVpbGQvbnVtYmVyX29mX2FiaXM9MgpncmFkbGVfYnVpbGQvZm9yY2Vfc3lzdGVtX2NlcnRzPWZhbHNlCnZlcnNpb25zL2xpbnV4X2RlYmlhbl9hcm02ND1mYWxzZQp2ZXJzaW9ucy9saW51eF9kZWJpYW5fYXJtMzI9ZmFsc2UKdmVyc2lvbnMvbGludXhfeDg2XzY0PWZhbHNlCnZlcnNpb25zL3dpbmRvd3NfeDg2XzY0PWZhbHNlCnZlcnNpb25zL21hY29zPWZhbHNlCnZlcnNpb25zL2FuZHJvaWQ9dHJ1ZQprZXlzdG9yZS9kZWJ1Zz0icmVzOi8vZGVidWcua2V5c3RvcmUiCmtleXN0b3JlL3JlbGVhc2U9IiIKa2V5c3RvcmUvZGVidWdfcGFzc3dvcmQ9ImFuZHJvaWQiCmtleXN0b3JlL3JlbGVhc2VfcGFzc3dvcmQ9IiIKa2V5c3RvcmUvZGVidWdfdXNlcj0iYW5kcm9pZGRlYnVna2V5IgprZXlzdG9yZS9yZWxlYXNlX3VzZXI9IiIKdmVyc2lvbi9jb2RlPTEKdmVyc2lvbi9uYW1lPSIxLjAiCnBhY2thZ2UvdW5pcXVlX25hbWU9Im9yZy5nb2RvdGVuZ2luZS50YW5rZmlnaHRlciIKcGFja2FnZS9zaWduZWQ9dHJ1ZQpzY3JlZW4vaW1tZXJzaXZlX21vZGU9dHJ1ZQpzY3JlZW4vb3JpZW50YXRpb249InBvcnRyYWl0IgpzY3JlZW4vaGFuZGhlbGQ9dHJ1ZQpzY3JlZW4vdGFibGV0PWZhbHNlCnNjcmVlbi90dj1mYWxzZQo=' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
+          echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSJyZXM6Ly9hbmRyb2lkL2J1aWxkLyIKY3VzdG9tX3BhY2thZ2UvcmVsZWFzZT0icmVzOi8vYW5kcm9pZC9idWlsZC8iCmFwa19leHBhbnNpb24vZW5hYmxlPWZhbHNlCmNvbW1hbmRfbGluZT0iIgpncmFkbGVfYnVpbGQvdXNlX2dyYWRsZV9idWlsZD10cnVlCmdyYWRsZV9idWlsZC9leHBvcnRfZm9ybWF0PTAKZ3JhZGxlX2J1aWxkL21pbl9zZGtfdmVyc2lvbj0iMjEiCmdyYWRsZV9idWlsZC90YXJnZXRfc2RrX3ZlcnNpb249IjMzIgpncmFkbGVfYnVpbGQvbnVtYmVyX29mX2FiaXM9MgpncmFkbGVfYnVpbGQvZm9yY2Vfc3lzdGVtX2NlcnRzPWZhbHNlCnZlcnNpb25zL2xpbnV4X2RlYmlhbl9hcm02ND1mYWxzZQp2ZXJzaW9ucy9saW51eF9kZWJpYW5fYXJtMzI9ZmFsc2UKdmVyc2lvbnMvbGludXhfeDg2XzY0PWZhbHNlCnZlcnNpb25zL3dpbmRvd3NfeDg2XzY0PWZhbHNlCnZlcnNpb25zL21hY29zPWZhbHNlCnZlcnNpb25zL2FuZHJvaWQ9dHJ1ZQprZXlzdG9yZS9kZWJ1Zz0icmVzOi8vZGVidWcua2V5c3RvcmUiCmtleXN0b3JlL3JlbGVhc2U9IiIKa2V5c3RvcmUvZGVidWdfcGFzc3dvcmQ9ImFuZHJvaWQiCmtleXN0b3JlL3JlbGVhc2VfcGFzc3dvcmQ9IiIKa2V5c3RvcmUvZGVidWdfdXNlcj0iYW5kcm9pZGRlYnVna2V5IgprZXlzdG9yZS9yZWxlYXNlX3VzZXI9IiIKdmVyc2lvbi9jb2RlPTEKdmVyc2lvbi9uYW1lPSIxLjAiCnBhY2thZ2UvdW5pcXVlX25hbWU9Im9yZy5nb2RvdGVuZ2luZS50YW5rZmlnaHRlciIKcGFja2FnZS9zaWduZWQ9dHJ1ZQpzY3JlZW4vaW1tZXJzaXZlX21vZGU9dHJ1ZQpzY3JlZW4vb3JpZW50YXRpb249InBvcnRyYWl0IgpzY3JlZW4vaGFuZGhlbGQ9dHJ1ZQpzY3JlZW4vdGFibGV0PWZhbHNlCnNjcmVlbi90dj1mYWxzZQo=' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
           
           keytool -genkey -v -keystore "$GITHUB_WORKSPACE/debug.keystore" \
             -storepass android \
@@ -101,8 +99,8 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
           
-          echo "Config ready:"
           head -3 "$GITHUB_WORKSPACE/export_presets.cfg"
+          ls -la "$GITHUB_WORKSPACE/debug.keystore"
 
       - name: Export Android APK
         env:
@@ -123,10 +121,13 @@ jobs:
           EC=$?
           echo "Exit code: $EC"
           if [ $EC -ne 0 ]; then
-            echo "Export failed"; exit $EC
+            echo "Export failed"
+            exit $EC
           fi
           if [ ! -f tankfighter.apk ]; then
-            echo "No APK produced"; exit 1
+            echo "No APK produced"
+            ls -la
+            exit 1
           fi
           ls -la tankfighter.apk
 
