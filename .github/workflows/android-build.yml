@@ -50,64 +50,6 @@ jobs:
         run: |
           ln -s /usr/bin/godot /godot
           
-          echo "Generating export_presets.cfg..."
-          cat > "$GITHUB_WORKSPACE/export_presets.cfg" << 'CFGEOF'
-[preset.0]
-
-name="Android"
-platform="Android"
-runnable=true
-dedicated_server=false
-custom_features=""
-export_filter="all_resources"
-include_filter=""
-exclude_filter=""
-export_path="tankfighter.apk"
-patches/Patch.0.enabled=false
-patches/Patch.0.name="Patch 0"
-patches/Patch.0.version="1.0"
-
-[preset.0.options]
-
-custom_package/debug=""
-custom_package/release=""
-apk_expansion/enable=false
-apk_expansion/S3_region=""
-apk_expansion/S3_bucket=""
-apk_expansion/S3_access_key=""
-apk_expansion/S3_secret_key=""
-command_line=""
-gradle_build/use_gradle_build=true
-gradle_build/export_format=0
-gradle_build/min_sdk_version="21"
-gradle_build/target_sdk_version="33"
-gradle_build/number_of_abis=2
-gradle_build/force_system_certs=false
-versions/linux_debian_arm64=false
-versions/linux_debian_arm32=false
-versions/linux_x86_64=false
-versions/windows_x86_64=false
-versions/macos=false
-versions/android=true
-keystore/debug="res://debug.keystore"
-keystore/release=""
-keystore/debug_password="android"
-keystore/release_password=""
-keystore/debug_user="androiddebugkey"
-keystore/release_user=""
-version/code=1
-version/name="1.0"
-package/unique_name="org.godotengine.tankfighter"
-package/signed=true
-screen/immersive_mode=true
-screen/orientation="portrait"
-screen/handheld=true
-screen/tablet=false
-screen/tv=false
-CFGEOF
-          echo "export_presets.cfg created"
-          ls -la "$GITHUB_WORKSPACE/export_presets.cfg"
-          
           echo "Setting up Godot export templates..."
           mkdir -p "$HOME/.local/share/godot/templates"
           
@@ -144,6 +86,66 @@ CFGEOF
           echo "Export templates installed successfully"
           ls -la "$HOME/.local/share/godot/templates/4.2.1.stable"
 
+      - name: Generate export_presets.cfg
+        run: |
+          echo "Generating export_presets.cfg..."
+          python3 -c "
+content = '''[preset.0]
+
+name=\"Android\"
+platform=\"Android\"
+runnable=true
+dedicated_server=false
+custom_features=\"\"
+export_filter=\"all_resources\"
+include_filter=\"\"
+exclude_filter=\"\"
+patches/Patch.0.enabled=false
+patches/Patch.0.name=\"Patch 0\"
+patches/Patch.0.version=\"1.0\"
+
+[preset.0.options]
+
+custom_package/debug=\"\"
+custom_package/release=\"\"
+apk_expansion/enable=false
+command_line=\"\"
+gradle_build/use_gradle_build=true
+gradle_build/export_format=0
+gradle_build/min_sdk_version=\"21\"
+gradle_build/target_sdk_version=\"33\"
+gradle_build/number_of_abis=2
+gradle_build/force_system_certs=false
+versions/linux_debian_arm64=false
+versions/linux_debian_arm32=false
+versions/linux_x86_64=false
+versions/windows_x86_64=false
+versions/macos=false
+versions/android=true
+keystore/debug=\"res://debug.keystore\"
+keystore/release=\"\"
+keystore/debug_password=\"android\"
+keystore/release_password=\"\"
+keystore/debug_user=\"androiddebugkey\"
+keystore/release_user=\"\"
+version/code=1
+version/name=\"1.0\"
+package/unique_name=\"org.godotengine.tankfighter\"
+package/signed=true
+screen/immersive_mode=true
+screen/orientation=\"portrait\"
+screen/handheld=true
+screen/tablet=false
+screen/tv=false
+'''
+          import os
+          path = os.environ['GITHUB_WORKSPACE'] + '/export_presets.cfg'
+          with open(path, 'w') as f:
+              f.write(content)
+          print('export_presets.cfg created at', path)
+          "
+          cat "$GITHUB_WORKSPACE/export_presets.cfg" | head -5
+
       - name: Generate debug keystore
         run: |
           echo "Generating Android debug keystore..."
@@ -165,31 +167,45 @@ CFGEOF
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "Starting Android export..."
-          set +e
           
           if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "Using release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
-            godot --headless --export-release Android tankfighter.apk --verbose 2>&1
+            godot --headless --export-release Android "$GITHUB_WORKSPACE/tankfighter.apk" --verbose 2>&1
           else
             echo "Using debug export..."
-            godot --headless --export-debug Android tankfighter.apk --verbose 2>&1
+            godot --headless --export-debug Android "$GITHUB_WORKSPACE/tankfighter.apk" --verbose 2>&1
           fi
           
           EXIT_CODE=$?
-          set -e
+          echo "Godot exit code: $EXIT_CODE"
           
           if [ $EXIT_CODE -ne 0 ]; then
             echo "ERROR: Godot export failed with exit code $EXIT_CODE"
             exit $EXIT_CODE
           fi
           
-          echo "Export command completed"
+          echo "Checking for APK file..."
+          if [ -f "$GITHUB_WORKSPACE/tankfighter.apk" ]; then
+            echo "APK found at $GITHUB_WORKSPACE/tankfighter.apk"
+            ls -la "$GITHUB_WORKSPACE/tankfighter.apk"
+          elif [ -f "tankfighter.apk" ]; then
+            echo "APK found in CWD"
+            ls -la tankfighter.apk
+          else
+            echo "APK not found. Searching..."
+            find "$GITHUB_WORKSPACE" -name "*.apk" -type f 2>/dev/null
+            find / -name "*.apk" -type f 2>/dev/null | head -10
+            echo "ERROR: No APK was produced by the export"
+            exit 1
+          fi
+          
+          echo "Export completed successfully"
 
       - name: List files after export
         run: |
           echo "=== POST-EXPORT FILE LISTING ==="
-          find . -type f | sort
+          ls -la
           echo "=== APK FILES ==="
           find . -name "*.apk" -type f || echo "No APK files found"
 
