@@ -11,13 +11,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container:
-      image: flashlight13/godot:4.4
+      image: flashlight13/godot:4.2.1
       options: --user root
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
       timeout-minutes: 30
-      ANDROID_HOME: /github/home/.android/sdk
-      HOME: /github/home
 
     steps:
       - name: Checkout code
@@ -29,13 +27,11 @@ jobs:
         run: |
           apt-get update && apt-get install -y \
             openjdk-17-jdk \
-            android-sdk-platform-tools-common \
             libc6 \
             libstdc++6 \
             zlib1g \
             wget \
-            unzip \
-            xvfb
+            unzip
 
       - name: Set up Java
         uses: actions/setup-java@v4.7.0
@@ -46,45 +42,35 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3.1.0
 
-      - name: Install Android SDK components
+      - name: Install SDK and templates
         run: |
+          ln -s /usr/bin/godot /godot
+          ANDROID_HOME="$ANDROID_SDK_ROOT"
+          
           yes | "$ANDROID_HOME/cmdline-tools/11.0/bin/sdkmanager" \
             "platforms;android-33" \
             "build-tools;33.0.0" \
-            --sdk_root="$ANDROID_HOME" 2>&1 | tail -5
-
-      - name: Prepare Android project
-        run: |
-          ln -s /usr/bin/godot /godot
+            --sdk_root="$ANDROID_HOME" 2>&1 | tail -3
           
-          echo "Downloading export templates..."
+          mkdir -p "$HOME/.local/share/godot"
+          
           wget -q --timeout=60 --tries=3 \
-            https://github.com/godotengine/godot/releases/download/4.4-stable/Godot_v4.4-stable_export_templates.tpz \
+            https://github.com/godotengine/godot/releases/download/4.2.1-stable/Godot_v4.2.1-stable_export_templates.tpz \
             -O /tmp/godot_templates.tpz || \
           wget -q --timeout=60 --tries=3 \
-            https://downloads.tuxfamily.org/godotengine/4.4/Godot_v4.4-stable_export_templates.tpz \
+            https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz \
             -O /tmp/godot_templates.tpz
           
-          if [ ! -f /tmp/godot_templates.tpz ]; then
-            echo "ERROR: Failed to download"
-            exit 1
-          fi
-          
           cd /tmp && unzip -q godot_templates.tpz && rm -f godot_templates.tpz
-          if [ ! -d templates ]; then
-            echo "ERROR: templates dir not found"
-            exit 1
-          fi
-          
           mkdir -p "$HOME/.local/share/godot/export_templates"
-          cp -r templates "$HOME/.local/share/godot/export_templates/4.4.stable"
+          cp -r templates "$HOME/.local/share/godot/export_templates/4.2.1.stable"
           
-          echo "Global templates installed at $HOME/.local/share/godot/export_templates/4.4.stable/"
-          ls "$HOME/.local/share/godot/export_templates/4.4.stable/" | head -5
-
-      - name: Generate config files
-        run: |
-          echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSIiCmN1c3RvbV9wYWNrYWdlL3JlbGVhc2U9IiIKYXBrX2V4cGFuc2lvbi9lbmFibGU9ZmFsc2UKY29tbWFuZF9saW5lPSIiCmdyYWRsZV9idWlsZC91c2VfZ3JhZGxlX2J1aWxkPXRydWUKZ3JhZGxlX2J1aWxkL2V4cG9ydF9mb3JtYXQ9MApncmFkbGVfYnVpbGQvbWluX3Nka192ZXJzaW9uPSIyMSIKZ3JhZGxlX2J1aWxkL3RhcmdldF9zZGtfdmVyc2lvbj0iMzMiCmdyYWRsZV9idWlsZC9udW1iZXJfb2ZfYWJpcz0yCmdyYWRsZV9idWlsZC9mb3JjZV9zeXN0ZW1fY2VydHM9ZmFsc2UKdmVyc2lvbnMvbGludXhfZGViaWFuX2FybTY0PWZhbHNlCnZlcnNpb25zL2xpbnV4X2RlYmlhbl9hcm0zMj1mYWxzZQp2ZXJzaW9ucy9saW51eF94ODZfNjQ9ZmFsc2UKdmVyc2lvbnMvd2luZG93c194ODZfNjQ9ZmFsc2UKdmVyc2lvbnMvbWFjb3M9ZmFsc2UKdmVyc2lvbnMvYW5kcm9pZD10cnVlCmtleXN0b3JlL2RlYnVnPSJyZXM6Ly9kZWJ1Zy5rZXlzdG9yZSIKa2V5c3RvcmUvcmVsZWFzZT0iIgprZXlzdG9yZS9kZWJ1Z19wYXNzd29yZD0iYW5kcm9pZCIKa2V5c3RvcmUvcmVsZWFzZV9wYXNzd29yZD0iIgprZXlzdG9yZS9kZWJ1Z191c2VyPSJhbmRyb2lkZGVidWdrZXkiCmtleXN0b3JlL3JlbGVhc2VfdXNlcj0iIgp2ZXJzaW9uL2NvZGU9MQp2ZXJzaW9uL25hbWU9IjEuMCIKcGFja2FnZS91bmlxdWVfbmFtZT0ib3JnLmdvZG90ZW5naW5lLnRhbmtmaWdodGVyIgpwYWNrYWdlL3NpZ25lZD10cnVlCnNjcmVlbi9pbW1lcnNpdmVfbW9kZT10cnVlCnNjcmVlbi9vcmllbnRhdGlvbj0icG9ydHJhaXQiCnNjcmVlbi9oYW5kaGVsZD10cnVlCnNjcmVlbi90YWJsZXQ9ZmFsc2UKc2NyZWVuL3R2PWZhbHNlCg==' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
+          mkdir -p "$GITHUB_WORKSPACE/android/build"
+          cp "$HOME/.local/share/godot/export_templates/4.2.1.stable/android_source.zip" /tmp/
+          cd /tmp && unzip -q android_source.zip -d "$GITHUB_WORKSPACE/android/build/"
+          rm -f android_source.zip
+          
+          echo 'W3ByZXNldC4wXQoKbmFtZT0iQW5kcm9pZCIKcGxhdGZvcm09IkFuZHJvaWQiCnJ1bm5hYmxlPXRydWUKZGVkaWNhdGVkX3NlcnZlcj1mYWxzZQpjdXN0b21fZmVhdHVyZXM9IiIKZXhwb3J0X2ZpbHRlcj0iYWxsX3Jlc291cmNlcyIKaW5jbHVkZV9maWx0ZXI9IiIKZXhjbHVkZV9maWx0ZXI9IiIKZXhwb3J0X3BhdGg9InRhbmtmaWdodGVyLmFwayIKcGF0Y2hlcy9QYXRjaC4wLmVuYWJsZWQ9ZmFsc2UKcGF0Y2hlcy9QYXRjaC4wLm5hbWU9IlBhdGNoIDAiCnBhdGNoZXMvUGF0Y2guMC52ZXJzaW9uPSIxLjAiCgpbcHJlc2V0LjAub3B0aW9uc10KCmN1c3RvbV9wYWNrYWdlL2RlYnVnPSJyZXM6Ly9hbmRyb2lkL2J1aWxkLyIKY3VzdG9tX3BhY2thZ2UvcmVsZWFzZT0icmVzOi8vYW5kcm9pZC9idWlsZC8iCmFwa19leHBhbnNpb24vZW5hYmxlPWZhbHNlCmNvbW1hbmRfbGluZT0iIgpncmFkbGVfYnVpbGQvdXNlX2dyYWRsZV9idWlsZD10cnVlCmdyYWRsZV9idWlsZC9leHBvcnRfZm9ybWF0PTAKZ3JhZGxlX2J1aWxkL21pbl9zZGtfdmVyc2lvbj0iMjEiCmdyYWRsZV9idWlsZC90YXJnZXRfc2RrX3ZlcnNpb249IjMzIgpncmFkbGVfYnVpbGQvbnVtYmVyX29mX2FiaXM9MgpncmFkbGVfYnVpbGQvZm9yY2Vfc3lzdGVtX2NlcnRzPWZhbHNlCnZlcnNpb25zL2xpbnV4X2RlYmlhbl9hcm02ND1mYWxzZQp2ZXJzaW9ucy9saW51eF9kZWJpYW5fYXJtMzI9ZmFsc2UKdmVyc2lvbnMvbGludXhfeDg2XzY0PWZhbHNlCnZlcnNpb25zL3dpbmRvd3NfeDg2XzY0PWZhbHNlCnZlcnNpb25zL21hY29zPWZhbHNlCnZlcnNpb25zL2FuZHJvaWQ9dHJ1ZQprZXlzdG9yZS9kZWJ1Zz0icmVzOi8vZGVidWcua2V5c3RvcmUiCmtleXN0b3JlL3JlbGVhc2U9IiIKa2V5c3RvcmUvZGVidWdfcGFzc3dvcmQ9ImFuZHJvaWQiCmtleXN0b3JlL3JlbGVhc2VfcGFzc3dvcmQ9IiIKa2V5c3RvcmUvZGVidWdfdXNlcj0iYW5kcm9pZGRlYnVna2V5IgprZXlzdG9yZS9yZWxlYXNlX3VzZXI9IiIKdmVyc2lvbi9jb2RlPTEKdmVyc2lvbi9uYW1lPSIxLjAiCnBhY2thZ2UvdW5pcXVlX25hbWU9Im9yZy5nb2RvdGVuZ2luZS50YW5rZmlnaHRlciIKcGFja2FnZS9zaWduZWQ9dHJ1ZQpzY3JlZW4vaW1tZXJzaXZlX21vZGU9dHJ1ZQpzY3JlZW4vb3JpZW50YXRpb249InBvcnRyYWl0IgpzY3JlZW4vaGFuZGhlbGQ9dHJ1ZQpzY3JlZW4vdGFibGV0PWZhbHNlCnNjcmVlbi90dj1mYWxzZQo=' | base64 -d > "$GITHUB_WORKSPACE/export_presets.cfg"
           
           keytool -genkey -v -keystore "$GITHUB_WORKSPACE/debug.keystore" \
             -storepass android \
@@ -95,43 +81,15 @@ jobs:
             -validity 10000 \
             -dname "CN=Android Debug,O=Android,C=US"
           
-          head -3 "$GITHUB_WORKSPACE/export_presets.cfg"
-          ls -la "$GITHUB_WORKSPACE/debug.keystore"
+          echo "All setup complete"
+          ls "$GITHUB_WORKSPACE/android/build/" | head -5
 
-      - name: Import project assets
+      - name: Export APK
         run: |
           cd "$GITHUB_WORKSPACE"
-          echo "Pre-importing assets via editor init..."
-          xvfb-run --auto-servernum godot --headless --editor --quit --verbose 2>&1 || true
-          echo "Assets initialized"
-
-      - name: Export Android APK
-        env:
-          ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE }}
-          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          cd "$GITHUB_WORKSPACE"
-          
-          if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
-            echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
-            godot --headless --export-release Android tankfighter.apk --verbose 2>&1
-          else
-            godot --headless --export-debug Android tankfighter.apk --verbose 2>&1
-          fi
-          
+          godot --headless --export-debug Android tankfighter.apk --verbose 2>&1
           EC=$?
-          echo "Exit code: $EC"
-          if [ $EC -ne 0 ]; then
-            echo "Export failed"
-            exit $EC
-          fi
-          if [ ! -f tankfighter.apk ]; then
-            echo "No APK produced"
-            ls -la
-            exit 1
-          fi
+          if [ $EC -ne 0 ]; then exit $EC; fi
           ls -la tankfighter.apk
 
       - name: Upload APK
