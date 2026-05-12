@@ -105,9 +105,9 @@ jobs:
       - name: Import project assets
         run: |
           cd "$GITHUB_WORKSPACE"
-          echo "Pre-importing assets..."
-          godot --headless --import . --verbose 2>&1
-          echo "Import complete"
+          echo "Pre-importing assets via editor init..."
+          xvfb-run --auto-servernum godot --headless --editor --quit --verbose 2>&1 || true
+          echo "Assets initialized"
 
       - name: Export Android APK
         env:
