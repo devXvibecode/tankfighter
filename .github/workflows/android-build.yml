@@ -42,10 +42,71 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3.1.0
+        with:
+          api-level: 33
+          build-tools: 33.0.0
 
-      - name: Setup Godot Export Templates
+      - name: Setup Godot and Export Templates
         run: |
           ln -s /usr/bin/godot /godot
+          
+          echo "Generating export_presets.cfg..."
+          cat > "$GITHUB_WORKSPACE/export_presets.cfg" << 'CFGEOF'
+[preset.0]
+
+name="Android"
+platform="Android"
+runnable=true
+dedicated_server=false
+custom_features=""
+export_filter="all_resources"
+include_filter=""
+exclude_filter=""
+export_path="tankfighter.apk"
+patches/Patch.0.enabled=false
+patches/Patch.0.name="Patch 0"
+patches/Patch.0.version="1.0"
+
+[preset.0.options]
+
+custom_package/debug=""
+custom_package/release=""
+apk_expansion/enable=false
+apk_expansion/S3_region=""
+apk_expansion/S3_bucket=""
+apk_expansion/S3_access_key=""
+apk_expansion/S3_secret_key=""
+command_line=""
+gradle_build/use_gradle_build=true
+gradle_build/export_format=0
+gradle_build/min_sdk_version="21"
+gradle_build/target_sdk_version="33"
+gradle_build/number_of_abis=2
+gradle_build/force_system_certs=false
+versions/linux_debian_arm64=false
+versions/linux_debian_arm32=false
+versions/linux_x86_64=false
+versions/windows_x86_64=false
+versions/macos=false
+versions/android=true
+keystore/debug="res://debug.keystore"
+keystore/release=""
+keystore/debug_password="android"
+keystore/release_password=""
+keystore/debug_user="androiddebugkey"
+keystore/release_user=""
+version/code=1
+version/name="1.0"
+package/unique_name="org.godotengine.tankfighter"
+package/signed=true
+screen/immersive_mode=true
+screen/orientation="portrait"
+screen/handheld=true
+screen/tablet=false
+screen/tv=false
+CFGEOF
+          echo "export_presets.cfg created"
+          ls -la "$GITHUB_WORKSPACE/export_presets.cfg"
           
           echo "Setting up Godot export templates..."
           mkdir -p "$HOME/.local/share/godot/templates"
@@ -63,7 +124,7 @@ jobs:
           fi
           
           if [ ! -f /tmp/godot_templates.tpz ]; then
-            echo "ERROR: Failed to download export templates from all sources"
+            echo "ERROR: Failed to download export templates"
             exit 1
           fi
           
@@ -75,7 +136,7 @@ jobs:
           if [ -d templates ]; then
             mv templates "$HOME/.local/share/godot/templates/4.2.1.stable"
           else
-            echo "ERROR: Unexpected archive structure after extraction"
+            echo "ERROR: Unexpected archive structure"
             ls -la /tmp/
             exit 1
           fi
@@ -83,16 +144,18 @@ jobs:
           echo "Export templates installed successfully"
           ls -la "$HOME/.local/share/godot/templates/4.2.1.stable"
 
-      - name: Verify Godot and Android Setup
+      - name: Generate debug keystore
         run: |
-          echo "Godot version:"
-          godot --version
-          ls -la debug.keystore 2>/dev/null || echo "Keystore not found"
-
-      - name: List files before export
-        run: |
-          echo "=== PRE-EXPORT FILE LISTING ==="
-          ls -la
+          echo "Generating Android debug keystore..."
+          keytool -genkey -v -keystore debug.keystore \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          ls -la debug.keystore
 
       - name: Export Android Project (Debug)
         env:
@@ -102,14 +165,23 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           echo "Starting Android export..."
+          set +e
           
           if [ -n "$ANDROID_KEYSTORE" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
             echo "Using release keystore..."
             echo "$ANDROID_KEYSTORE" | base64 -d > /tmp/release.keystore
-            godot --headless --export-release Android tankfighter.apk --verbose
+            godot --headless --export-release Android tankfighter.apk --verbose 2>&1
           else
             echo "Using debug export..."
-            godot --headless --export-debug Android tankfighter.apk --verbose
+            godot --headless --export-debug Android tankfighter.apk --verbose 2>&1
+          fi
+          
+          EXIT_CODE=$?
+          set -e
+          
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Godot export failed with exit code $EXIT_CODE"
+            exit $EXIT_CODE
           fi
           
           echo "Export command completed"
