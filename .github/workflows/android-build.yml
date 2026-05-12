@@ -85,14 +85,12 @@ jobs:
               cd "$HOME/.local/share/godot/templates"
               
               echo "Downloading export templates from official Godot mirror..."
-              # Try multiple mirrors in case one fails
-              MIRRORS=(
-                "https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
-                "https://mirror.godotengine.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
-              )
+              # Try multiple mirrors without using bash arrays
+              MIRROR_1="https://downloads.tuxfamily.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
+              MIRROR_2="https://mirror.godotengine.org/godotengine/4.2.1/Godot_v4.2.1-stable_export_templates.tpz"
               
               DOWNLOAD_SUCCESS=0
-              for MIRROR in "${MIRRORS[@]}"; do
+              for MIRROR in "$MIRROR_1" "$MIRROR_2"; do
                 echo "Trying mirror: $MIRROR"
                 if wget --timeout=30 --tries=2 "$MIRROR" -O godot_templates.tpz; then
                   DOWNLOAD_SUCCESS=1
